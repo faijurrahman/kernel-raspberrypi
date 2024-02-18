@@ -120,11 +120,32 @@ static int bcm2835_gpiomem_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
+static int bcm2835_gpiomem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct vm_area_struct *vma = (struct vm_area_struct *) arg;
+	/* Ignore what the user says - they're getting the GPIO regs
+	   whether they like it or not! */
+	unsigned long gpio_page = inst->gpio_regs_phys >> PAGE_SHIFT;
+
+	vma->vm_page_prot = phys_mem_access_prot(file, gpio_page,
+						 PAGE_SIZE,
+						 vma->vm_page_prot);
+	vma->vm_ops = &bcm2835_gpiomem_vm_ops;
+	if (remap_pfn_range(vma, vma->vm_start,
+			gpio_page,
+			PAGE_SIZE,
+			vma->vm_page_prot)) {
+		return -EAGAIN;
+	}
+	return 0;
+}
+
 static const struct file_operations
 bcm2835_gpiomem_fops = {
 	.owner = THIS_MODULE,
 	.open = bcm2835_gpiomem_open,
 	.release = bcm2835_gpiomem_release,
+	.unlocked_ioctl = bcm2835_gpiomem_ioctl,
 	.mmap = bcm2835_gpiomem_mmap,
 };
 
